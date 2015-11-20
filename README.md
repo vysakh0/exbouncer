@@ -36,6 +36,41 @@ Use this in any of your plug module, where you fetch the current user or admin. 
       ]
     end
     ```
+
+    **First argument:**
+
+    It should be a resource like %User{} or %Admin{}, it can even be
+    %User{role: :admin}, as bouncer_for creates method pattern matching it.
+
+    **Second argument:**
+
+    It should be an array.
+
+    - Each element can be an array which denotes the path_info
+
+    ```
+    ["api", "posts", _]
+    ```
+    will match the any `http` method (since nothing is specified explicitly). And `_` would mean it would match `/api/posts/*` such as these
+
+    ```
+    GET /api/posts/1
+    GET /api/posts/latest
+    POST /api/posts
+    DELETE /api/posts/1
+    ```
+
+    -  Or method can be explicitly specified in a `tuple` of METHOD & path_info like
+
+    ```
+    {"GET", ["api", "users", _]}
+    ```
+    will match routes such as these
+    ```
+    GET /api/posts/1
+    GET /api/posts/latest
+    ```
+
 ## Usage
 
 In your plug, once you identify the appropriate resource (say: a current user), you can pass it to check if they are allowed to visit the route.
