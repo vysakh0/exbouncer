@@ -3,7 +3,7 @@ defmodule ExBouncer.Mixfile do
 
   def project do
     [app: :exbouncer,
-      version: "0.0.1",
+      version: "0.0.2",
       elixir: "~> 1.0",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
@@ -13,7 +13,7 @@ defmodule ExBouncer.Mixfile do
         links: %{github: "https://github.com/vysakh0/exbouncer"}
       ],
       description: """
-      An authorization library in Elixir for Plug applications that restricts what resources the current user/admin or any role is allowed to access,
+      Has a simple module to define allowed paths and thereby help in authorization.
       """,
     deps: deps]
   end
