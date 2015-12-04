@@ -1,66 +1,84 @@
 defmodule ExBouncer do
   @moduledoc """
-  A ExBouncer.Entries module needs to be defined with authorized routes.
+  A module which imports `ExBouncer` needs to be defined with authorized routes.
 
-      defmodule ExBouncer.Entries do
-        import ExBouncer.Base
+      defmodule MyApp.AuthorizedRoutes do
+        import ExBouncer
 
-        exbouncer_for %User{role: :admin}, [
+        bouncer_for %User{role: :admin}, [
           ["api", "users", _]
         ]
       end
 
+  This would result in dynamic methods like
+
+      def allow?(%User{role: :admin}, %{method: _, path_info: ["api", "users", _]}), do: true
+      def allow?(%User{role: :admin}, %{method: "DELETE", path_info: ["api", "users", _]}), do: true
+
+      def allow_visitor?(%User{role: :admin}, %{method: _, path_info ["api", "users", _]}), do: false
+      def allow_visitor?(%User{role: :admin}, %{method: "DELETE", path_info: ["api", "users", _]}), do: false
+
+
+  With these methods, pattern matching is done to assert if the resource is allowed or not.
   This means, a %User{role: :admin} can visit /api/users/* route.
 
   So, just after you set your current_user in your plug, you could invoke,
 
-        ExBouncer.allow_resource?(user, conn)
+        MyApp.AuthorizedRoutes.allow?(user, conn)
         #=> true
 
-  This would give true/false based on `ExBouncer.Entries` made.
+  This would give true/false based on authorized entry you made.
 
-  Since this route (/api/users/*) is allowed for %User{role: :admin}, it won't be allowed for any others, including visitors. In case if you want to check if the route is accessible to visitors you could do
+  Since this route (`/api/users/*`) is allowed for `%User{role: :admin}`,
+  it won't be allowed for any others, including visitors.
+  In case if you want to check if the route is accessible to visitors you could do
 
-    ExBouncer.allow_visitor?(conn)
-    #=> false
-
+        MyApp.AuthorizedRoutes.allow_visitor?(conn)
+        #=> false
   """
-  alias ExBouncer.Entries
 
   @doc """
-  If a `exbouncer_for` entry for a particular resource say, %User{}  is made in `ExBouncer.Entries` (see h ExBouncer), then we can be assured that other resource will not allowed :)
+  After importing `ExBouncer` in your Authorization module, the various allowed
+  paths for a resource needs to be defined using `bouncer_for` macro.
 
-      ExBouncer.allow_resource?(conn)
-      #=> false
+  First argument:
+    It should be a resource like %User{} or %Admin{}, it can even be
+  %User{role: :admin}, as bouncer_for creates method pattern matching it.
+
+  Second argument:
+    It should be a list and each element can be a list or a tuple.
+
+    1. Each element can be a list which denotes the path_info like ["api", "posts", _] or
+    2. A tuple of METHOD & path_info like {"GET", ["api", "users"]}
   """
-  def allow_resource?(resource, conn) do
-    resource_allowed?(resource, conn.method, conn.path_info)
+  defmacro bouncer_for(model, allowed_routes) do
+    for route <- allowed_routes do
+      generate_method(model, route)
+    end
+    ++
+    [default_methods]
   end
 
-  @doc """
-  For every `exbouncer_for` for a particular resource (say %User{}) is made, then for that route `allow_visitor?\1` would be false.
-
-      ExBouncer.allow_visitor?(conn)
-      #=> false
-  """
-  def allow_visitor?(conn) do
-    visitor_allowed?(conn.method, conn.path_info)
-  end
-
-  defp resource_allowed?(resource, method, path) do
-    try do
-      Entries.allow?(resource, method, path)
-    rescue
-      _ -> false
+  defp generate_method(model, {method, final_route}) do
+    quote  do
+      def allow?(unquote(model), %{method: unquote(method), path_info: unquote(final_route)}), do: true
+      def allow_visitor?(%{method: unquote(method), path_info: unquote(final_route)}), do: false
     end
   end
 
-  defp visitor_allowed?(method, path) do
-    try do
-      Entries.visitor_allow?(method, path)
-    rescue
-      _ -> true
+  defp generate_method(model, final_route) do
+    quote  do
+      def allow?(unquote(model), %{method: _, path_info: unquote(final_route)}), do: true
+      def allow_visitor?(%{method: _, path_info: unquote(final_route)}), do: false
     end
   end
 
+  defp default_methods do
+    quote do
+      def allow?(_, _), do: false
+      def allow?(_), do: false
+      def allow_visitor?(_, _), do: true
+      def allow_visitor?(_), do: true
+    end
+  end
 end
